@@ -4,15 +4,19 @@ import (
 	"log"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sainakuo/subscription-service/internal/config"
 	"github.com/sainakuo/subscription-service/internal/handler"
 )
 
 func main() {
+	cfg := config.Load()
+
 	router := gin.Default()
 	router.GET("/health", handler.HealthCheck)
-	log.Println("Subscription service started on port 8080")
+	address := ":" + cfg.AppPort
+	log.Printf("Subscription service started on port %v", cfg.AppPort)
 
-	err := router.Run(":8080")
+	err := router.Run(address)
 
 	if err != nil {
 		log.Fatalf("failed to start server: %v", err)
