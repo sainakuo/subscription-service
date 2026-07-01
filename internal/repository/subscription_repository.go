@@ -235,6 +235,7 @@ type rowScanner interface {
 
 func scanSubscription(row rowScanner) (*model.Subscription, error) {
 	var subscription model.Subscription
+	var startDate pgtype.Date
 	var endDate pgtype.Date
 
 	err := row.Scan(
@@ -242,7 +243,7 @@ func scanSubscription(row rowScanner) (*model.Subscription, error) {
 		&subscription.ServiceName,
 		&subscription.Price,
 		&subscription.UserID,
-		&subscription.StartDate,
+		&startDate,
 		&endDate,
 		&subscription.CreatedAt,
 		&subscription.UpdatedAt,
@@ -250,6 +251,12 @@ func scanSubscription(row rowScanner) (*model.Subscription, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if !startDate.Valid {
+		return nil, fmt.Errorf("start_date is invalid")
+	}
+
+	subscription.StartDate = startDate.Time
 
 	if endDate.Valid {
 		date := endDate.Time

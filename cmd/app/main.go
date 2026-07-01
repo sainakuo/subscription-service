@@ -8,6 +8,8 @@ import (
 	"github.com/sainakuo/subscription-service/internal/config"
 	database "github.com/sainakuo/subscription-service/internal/db"
 	"github.com/sainakuo/subscription-service/internal/handler"
+	"github.com/sainakuo/subscription-service/internal/repository"
+	"github.com/sainakuo/subscription-service/internal/service"
 )
 
 func main() {
@@ -22,8 +24,15 @@ func main() {
 
 	log.Println("Database connection established")
 
+	subscriptionRepository := repository.NewSubscriptionRepository(dbPool)
+	subscriptionService := service.NewSubscriptionService(subscriptionRepository)
+	subscriptionHandler := handler.NewSubscriptionHandler(subscriptionService)
+
 	router := gin.Default()
 	router.GET("/health", handler.HealthCheck)
+
+	router.POST("/subscriptions", subscriptionHandler.Create)
+
 	address := ":" + cfg.AppPort
 	log.Printf("Subscription service started on port %v", cfg.AppPort)
 
