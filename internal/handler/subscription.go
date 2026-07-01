@@ -185,6 +185,27 @@ func (h *SubscriptionHandler) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, toSubscriptionResponse(subscription))
 }
 
+func (h *SubscriptionHandler) Delete(c *gin.Context) {
+	id := c.Param("id")
+
+	err := h.service.Delete(c.Request.Context(), id)
+	if err != nil {
+		if errors.Is(err, service.ErrSubscriptionNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": "subscription not found",
+			})
+			return
+		}
+
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
 func parseQueryInt(c *gin.Context, key string, defaultValue int) (int, error) {
 	value := c.Query(key)
 	if value == "" {

@@ -206,6 +206,24 @@ func (s *SubscriptionService) Update(ctx context.Context, input UpdateSubscripti
 	return updatedSubscription, nil
 }
 
+func (s *SubscriptionService) Delete(ctx context.Context, id string) error {
+	subscriptionID, err := uuid.Parse(id)
+	if err != nil {
+		return fmt.Errorf("id must be a valid UUID")
+	}
+
+	err = s.repo.Delete(ctx, subscriptionID)
+	if err != nil {
+		if errors.Is(err, repository.ErrSubscriptionNotFound) {
+			return ErrSubscriptionNotFound
+		}
+
+		return fmt.Errorf("failed to delete subscription: %w", err)
+	}
+
+	return nil
+}
+
 func ParseMonthYear(value string) (time.Time, error) {
 	value = strings.TrimSpace(value)
 
