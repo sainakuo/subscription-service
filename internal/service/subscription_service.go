@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -14,6 +15,8 @@ import (
 type SubscriptionService struct {
 	repo *repository.SubscriptionRepository
 }
+
+var ErrSubscriptionNotFound = errors.New("subscription not found")
 
 type CreateSubscriptionInput struct {
 	ServiceName string
@@ -72,6 +75,24 @@ func (s *SubscriptionService) Create(ctx context.Context, input CreateSubscripti
 	}
 
 	return s.repo.Create(ctx, subscription)
+}
+
+func (s *SubscriptionService) GetByID(ctx context.Context, id string) (*model.Subscription, error) {
+	subscriptionID, err := uuid.Parse(id)
+	if err != nil {
+		return nil, fmt.Errorf("id must be a valid UUID")
+	}
+
+	subscription, err := s.repo.GetByID(ctx, subscriptionID)
+	if err != nil {
+		if errors.Is(err, repository.ErrSubscriptionNotFound) {
+			return nil, ErrSubscriptionNotFound
+		}
+
+		return nil, fmt.Errorf("failed to get subscription: %w", err)
+	}
+
+	return subscription, nil
 }
 
 func ParseMonthYear(value string) (time.Time, error) {

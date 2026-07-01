@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
@@ -66,6 +67,27 @@ func (h *SubscriptionHandler) Create(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, toSubscriptionResponse(subscription))
+}
+
+func (h *SubscriptionHandler) GetByID(c *gin.Context) {
+	id := c.Param("id")
+
+	subscription, err := h.service.GetByID(c.Request.Context(), id)
+	if err != nil {
+		if errors.Is(err, service.ErrSubscriptionNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": "subscription not found",
+			})
+			return
+		}
+
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, toSubscriptionResponse(subscription))
 }
 
 func toSubscriptionResponse(subscription *model.Subscription) SubscriptionResponse {
