@@ -26,6 +26,13 @@ type CreateSubscriptionInput struct {
 	EndDate     string
 }
 
+type ListSubscriptionsInput struct {
+	UserID      string
+	ServiceName string
+	Limit       int
+	Offset      int
+}
+
 func NewSubscriptionService(repo *repository.SubscriptionRepository) *SubscriptionService {
 	return &SubscriptionService{
 		repo: repo,
@@ -93,6 +100,41 @@ func (s *SubscriptionService) GetByID(ctx context.Context, id string) (*model.Su
 	}
 
 	return subscription, nil
+}
+
+func (s *SubscriptionService) List(ctx context.Context, input ListSubscriptionsInput) ([]model.Subscription, error) {
+	var userID *uuid.UUID
+
+	if strings.TrimSpace(input.UserID) != "" {
+		parsedUserID, err := uuid.Parse(input.UserID)
+		if err != nil {
+			return nil, fmt.Errorf("user_id must be a valid UUID")
+		}
+
+		userID = &parsedUserID
+	}
+
+	if input.Limit < 0 {
+		return nil, fmt.Errorf("limit cannot be negative")
+	}
+
+	if input.Offset < 0 {
+		return nil, fmt.Errorf("offset cannot be negative")
+	}
+
+	filter := repository.SubscriptionFilter{
+		UserID:      userID,
+		ServiceName: strings.TrimSpace(input.ServiceName),
+		Limit:       input.Limit,
+		Offset:      input.Offset,
+	}
+
+	subscriptions, err := s.repo.List(ctx, filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list subscriptions: %w", err)
+	}
+
+	return subscriptions, nil
 }
 
 func ParseMonthYear(value string) (time.Time, error) {

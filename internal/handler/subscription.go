@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -88,6 +89,61 @@ func (h *SubscriptionHandler) GetByID(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, toSubscriptionResponse(subscription))
+}
+
+func (h *SubscriptionHandler) List(c *gin.Context) {
+	limit, err := parseQueryInt(c, "limit", 20)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "limit must be a valid integer",
+		})
+		return
+	}
+
+	offset, err := parseQueryInt(c, "offset", 0)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "offset must be a valid integer",
+		})
+		return
+	}
+
+	subscriptions, err := h.service.List(
+		c.Request.Context(),
+		service.ListSubscriptionsInput{
+			UserID:      c.Query("user_id"),
+			ServiceName: c.Query("service_name"),
+			Limit:       limit,
+			Offset:      offset,
+		},
+	)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	items := make([]SubscriptionResponse, 0, len(subscriptions))
+	for i := range subscriptions {
+		items = append(items, toSubscriptionResponse(&subscriptions[i]))
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"items":  items,
+		"count":  len(items),
+		"limit":  limit,
+		"offset": offset,
+	})
+}
+
+func parseQueryInt(c *gin.Context, key string, defaultValue int) (int, error) {
+	value := c.Query(key)
+	if value == "" {
+		return defaultValue, nil
+	}
+
+	return strconv.Atoi(value)
 }
 
 func toSubscriptionResponse(subscription *model.Subscription) SubscriptionResponse {
