@@ -33,6 +33,15 @@ type ListSubscriptionsInput struct {
 	Offset      int
 }
 
+type UpdateSubscriptionInput struct {
+	ID          string
+	ServiceName string
+	Price       int
+	UserID      string
+	StartDate   string
+	EndDate     string
+}
+
 func NewSubscriptionService(repo *repository.SubscriptionRepository) *SubscriptionService {
 	return &SubscriptionService{
 		repo: repo,
@@ -135,6 +144,66 @@ func (s *SubscriptionService) List(ctx context.Context, input ListSubscriptionsI
 	}
 
 	return subscriptions, nil
+}
+
+func (s *SubscriptionService) Update(ctx context.Context, input UpdateSubscriptionInput) (*model.Subscription, error) {
+	subscriptionID, err := uuid.Parse(input.ID)
+	if err != nil {
+		return nil, fmt.Errorf("id must be a valid UUID")
+	}
+
+	serviceName := strings.TrimSpace(input.ServiceName)
+	if serviceName == "" {
+		return nil, fmt.Errorf("service_name is required")
+	}
+
+	if input.Price <= 0 {
+		return nil, fmt.Errorf("price must be greater than 0")
+	}
+
+	userID, err := uuid.Parse(input.UserID)
+	if err != nil {
+		return nil, fmt.Errorf("user_id must be a valid UUID")
+	}
+
+	startDate, err := ParseMonthYear(input.StartDate)
+	if err != nil {
+		return nil, fmt.Errorf("start_date must be in MM-YYYY format")
+	}
+
+	var endDate *time.Time
+	if strings.TrimSpace(input.EndDate) != "" {
+		parsedEndDate, err := ParseMonthYear(input.EndDate)
+		if err != nil {
+			return nil, fmt.Errorf("end_date must be in MM-YYYY format")
+		}
+
+		if parsedEndDate.Before(startDate) {
+			return nil, fmt.Errorf("end_date cannot be before start_date")
+		}
+
+		endDate = &parsedEndDate
+	}
+
+	subscription := &model.Subscription{
+		ID:          subscriptionID,
+		ServiceName: serviceName,
+		Price:       input.Price,
+		UserID:      userID,
+		StartDate:   startDate,
+		EndDate:     endDate,
+	}
+
+	updatedSubscription, err := s.repo.Update(ctx, subscription)
+	if err != nil {
+		if errors.Is(err, repository.ErrSubscriptionNotFound) {
+			return nil, ErrSubscriptionNotFound
+		}
+
+		return nil, fmt.Errorf("failed to update subscription: %w", err)
+	}
+
+	return updatedSubscription, nil
 }
 
 func ParseMonthYear(value string) (time.Time, error) {

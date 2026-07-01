@@ -29,6 +29,14 @@ type CreateSubscriptionRequest struct {
 	EndDate     string `json:"end_date,omitempty"`
 }
 
+type UpdateSubscriptionRequest struct {
+	ServiceName string `json:"service_name" binding:"required"`
+	Price       *int   `json:"price" binding:"required"`
+	UserID      string `json:"user_id" binding:"required"`
+	StartDate   string `json:"start_date" binding:"required"`
+	EndDate     string `json:"end_date,omitempty"`
+}
+
 type SubscriptionResponse struct {
 	ID          string    `json:"id"`
 	ServiceName string    `json:"service_name"`
@@ -135,6 +143,46 @@ func (h *SubscriptionHandler) List(c *gin.Context) {
 		"limit":  limit,
 		"offset": offset,
 	})
+}
+
+func (h *SubscriptionHandler) Update(c *gin.Context) {
+	id := c.Param("id")
+
+	var request UpdateSubscriptionRequest
+
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid request body",
+		})
+		return
+	}
+
+	subscription, err := h.service.Update(
+		c.Request.Context(),
+		service.UpdateSubscriptionInput{
+			ID:          id,
+			ServiceName: request.ServiceName,
+			Price:       *request.Price,
+			UserID:      request.UserID,
+			StartDate:   request.StartDate,
+			EndDate:     request.EndDate,
+		},
+	)
+	if err != nil {
+		if errors.Is(err, service.ErrSubscriptionNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": "subscription not found",
+			})
+			return
+		}
+
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, toSubscriptionResponse(subscription))
 }
 
 func parseQueryInt(c *gin.Context, key string, defaultValue int) (int, error) {

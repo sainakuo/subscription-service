@@ -37,6 +37,8 @@ func main() {
 
 	router.GET("/subscriptions/:id", subscriptionHandler.GetByID)
 
+	router.PUT("/subscriptions/:id", subscriptionHandler.Update)
+
 	address := ":" + cfg.AppPort
 	log.Printf("Subscription service started on port %v", cfg.AppPort)
 
