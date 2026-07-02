@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -23,6 +24,13 @@ type SubscriptionFilter struct {
 	ServiceName string
 	Limit       int
 	Offset      int
+}
+
+type TotalCostFilter struct {
+	From        time.Time
+	To          time.Time
+	UserID      *uuid.UUID
+	ServiceName string
 }
 
 func NewSubscriptionRepository(db *pgxpool.Pool) *SubscriptionRepository {
@@ -227,6 +235,63 @@ func (r *SubscriptionRepository) Delete(ctx context.Context, id uuid.UUID) error
 	}
 
 	return nil
+}
+
+func (r *SubscriptionRepository) ListActiveInPeriod(ctx context.Context, filter TotalCostFilter) ([]model.Subscription, error) {
+	query := `
+		SELECT 
+			id,
+			service_name,
+			price,
+			user_id,
+			start_date,
+			end_date,
+			created_at,
+			updated_at
+		FROM subscriptions
+		WHERE start_date <= $1
+		  AND (end_date IS NULL OR end_date >= $2)
+	`
+
+	args := []any{filter.To, filter.From}
+	argNumber := 3
+
+	if filter.UserID != nil {
+		query += fmt.Sprintf(" AND user_id = $%d", argNumber)
+		args = append(args, *filter.UserID)
+		argNumber++
+	}
+
+	if filter.ServiceName != "" {
+		query += fmt.Sprintf(" AND service_name ILIKE $%d", argNumber)
+		args = append(args, "%"+filter.ServiceName+"%")
+		argNumber++
+	}
+
+	query += " ORDER BY start_date ASC"
+
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list active subscriptions in period: %w", err)
+	}
+	defer rows.Close()
+
+	subscriptions := make([]model.Subscription, 0)
+
+	for rows.Next() {
+		subscription, err := scanSubscription(rows)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan subscription: %w", err)
+		}
+
+		subscriptions = append(subscriptions, *subscription)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows error while listing active subscriptions: %w", err)
+	}
+
+	return subscriptions, nil
 }
 
 type rowScanner interface {

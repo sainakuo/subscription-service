@@ -48,6 +48,15 @@ type SubscriptionResponse struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
+type TotalCostResponse struct {
+	TotalPrice  int    `json:"total_price"`
+	Currency    string `json:"currency"`
+	From        string `json:"from"`
+	To          string `json:"to"`
+	UserID      string `json:"user_id,omitempty"`
+	ServiceName string `json:"service_name,omitempty"`
+}
+
 func (h *SubscriptionHandler) Create(c *gin.Context) {
 	var request CreateSubscriptionRequest
 
@@ -204,6 +213,50 @@ func (h *SubscriptionHandler) Delete(c *gin.Context) {
 	}
 
 	c.Status(http.StatusNoContent)
+}
+
+func (h *SubscriptionHandler) CalculateTotalCost(c *gin.Context) {
+	from := c.Query("from")
+	to := c.Query("to")
+
+	if from == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "from is required",
+		})
+		return
+	}
+
+	if to == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "to is required",
+		})
+		return
+	}
+
+	result, err := h.service.CalculateTotalCost(
+		c.Request.Context(),
+		service.TotalCostInput{
+			From:        from,
+			To:          to,
+			UserID:      c.Query("user_id"),
+			ServiceName: c.Query("service_name"),
+		},
+	)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, TotalCostResponse{
+		TotalPrice:  result.TotalPrice,
+		Currency:    result.Currency,
+		From:        result.From,
+		To:          result.To,
+		UserID:      result.UserID,
+		ServiceName: result.ServiceName,
+	})
 }
 
 func parseQueryInt(c *gin.Context, key string, defaultValue int) (int, error) {

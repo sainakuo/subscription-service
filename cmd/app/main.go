@@ -35,6 +35,8 @@ func main() {
 
 	router.GET("/subscriptions", subscriptionHandler.List)
 
+	router.GET("/subscriptions/total", subscriptionHandler.CalculateTotalCost)
+
 	router.GET("/subscriptions/:id", subscriptionHandler.GetByID)
 
 	router.PUT("/subscriptions/:id", subscriptionHandler.Update)

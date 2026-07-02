@@ -42,6 +42,22 @@ type UpdateSubscriptionInput struct {
 	EndDate     string
 }
 
+type TotalCostInput struct {
+	From        string
+	To          string
+	UserID      string
+	ServiceName string
+}
+
+type TotalCostResult struct {
+	TotalPrice  int
+	Currency    string
+	From        string
+	To          string
+	UserID      string
+	ServiceName string
+}
+
 func NewSubscriptionService(repo *repository.SubscriptionRepository) *SubscriptionService {
 	return &SubscriptionService{
 		repo: repo,
@@ -224,6 +240,72 @@ func (s *SubscriptionService) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
+func (s *SubscriptionService) CalculateTotalCost(ctx context.Context, input TotalCostInput) (*TotalCostResult, error) {
+	fromDate, err := ParseMonthYear(input.From)
+	if err != nil {
+		return nil, fmt.Errorf("from must be in MM-YYYY format")
+	}
+
+	toDate, err := ParseMonthYear(input.To)
+	if err != nil {
+		return nil, fmt.Errorf("to must be in MM-YYYY format")
+	}
+
+	if toDate.Before(fromDate) {
+		return nil, fmt.Errorf("to cannot be before from")
+	}
+
+	var userID *uuid.UUID
+	if strings.TrimSpace(input.UserID) != "" {
+		parsedUserID, err := uuid.Parse(input.UserID)
+		if err != nil {
+			return nil, fmt.Errorf("user_id must be a valid UUID")
+		}
+
+		userID = &parsedUserID
+	}
+
+	serviceName := strings.TrimSpace(input.ServiceName)
+
+	subscriptions, err := s.repo.ListActiveInPeriod(
+		ctx,
+		repository.TotalCostFilter{
+			From:        fromDate,
+			To:          toDate,
+			UserID:      userID,
+			ServiceName: serviceName,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate total cost: %w", err)
+	}
+
+	total := 0
+
+	for i := range subscriptions {
+		subscription := subscriptions[i]
+
+		activeFrom := maxMonth(subscription.StartDate, fromDate)
+		activeTo := toDate
+
+		if subscription.EndDate != nil {
+			activeTo = minMonth(*subscription.EndDate, toDate)
+		}
+
+		months := monthsBetweenInclusive(activeFrom, activeTo)
+		total += subscription.Price * months
+	}
+
+	return &TotalCostResult{
+		TotalPrice:  total,
+		Currency:    "RUB",
+		From:        FormatMonthYear(fromDate),
+		To:          FormatMonthYear(toDate),
+		UserID:      strings.TrimSpace(input.UserID),
+		ServiceName: serviceName,
+	}, nil
+}
+
 func ParseMonthYear(value string) (time.Time, error) {
 	value = strings.TrimSpace(value)
 
@@ -232,4 +314,24 @@ func ParseMonthYear(value string) (time.Time, error) {
 
 func FormatMonthYear(value time.Time) string {
 	return value.Format("01-2006")
+}
+
+func monthsBetweenInclusive(from time.Time, to time.Time) int {
+	return (to.Year()-from.Year())*12 + int(to.Month()-from.Month()) + 1
+}
+
+func maxMonth(a time.Time, b time.Time) time.Time {
+	if a.After(b) {
+		return a
+	}
+
+	return b
+}
+
+func minMonth(a time.Time, b time.Time) time.Time {
+	if a.Before(b) {
+		return a
+	}
+
+	return b
 }
