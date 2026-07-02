@@ -16,6 +16,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
   migrate:
     image: migrate/migrate:latest
     container_name: subscription_migrate
@@ -26,12 +27,35 @@ services:
         "-path",
         "/migrations",
         "-database",
-        "postgres://postgres:postgres@postgres:5432/subscriptions?sslmode=disable",
+        "postgres://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}?sslmode=${DB_SSLMODE}",
         "up"
       ]
     depends_on:
       postgres:
         condition: service_healthy
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: subscription_app
+    restart: unless-stopped
+    environment:
+      APP_PORT: ${APP_PORT}
+      LOG_LEVEL: ${LOG_LEVEL}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_SSLMODE: ${DB_SSLMODE}
+    ports:
+      - "${APP_PORT}:${APP_PORT}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
 volumes:
   postgres_data:
