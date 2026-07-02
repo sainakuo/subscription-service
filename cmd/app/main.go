@@ -2,33 +2,53 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sainakuo/subscription-service/internal/config"
 	database "github.com/sainakuo/subscription-service/internal/db"
 	"github.com/sainakuo/subscription-service/internal/handler"
+	"github.com/sainakuo/subscription-service/internal/logger"
+	"github.com/sainakuo/subscription-service/internal/middleware"
 	"github.com/sainakuo/subscription-service/internal/repository"
 	"github.com/sainakuo/subscription-service/internal/service"
 )
 
 func main() {
 	cfg := config.Load()
+
+	log := logger.New(cfg.LogLevel)
+	slog.SetDefault(log)
+
+	log.Info("configuration loaded",
+		"app_port", cfg.AppPort,
+		"log_level", cfg.LogLevel,
+		"db_host", cfg.DBHost,
+		"db_port", cfg.DBPort,
+		"db_name", cfg.DBName,
+	)
+
 	ctx := context.Background()
 
 	dbPool, err := database.NewPostgresPool(ctx, cfg)
 	if err != nil {
-		log.Fatalf("failed to connect to database: %v", err)
+		log.Error("failed to connect to database", "error", err)
+		os.Exit(1)
 	}
 	defer dbPool.Close()
 
-	log.Println("Database connection established")
+	log.Info("Database connection established")
 
 	subscriptionRepository := repository.NewSubscriptionRepository(dbPool)
 	subscriptionService := service.NewSubscriptionService(subscriptionRepository)
-	subscriptionHandler := handler.NewSubscriptionHandler(subscriptionService)
+	subscriptionHandler := handler.NewSubscriptionHandler(subscriptionService, log)
 
-	router := gin.Default()
+	router := gin.New()
+
+	router.Use(gin.Recovery())
+	router.Use(middleware.RequestLogger(log))
+
 	router.GET("/health", handler.HealthCheck)
 
 	router.POST("/subscriptions", subscriptionHandler.Create)
@@ -44,11 +64,12 @@ func main() {
 	router.DELETE("/subscriptions/:id", subscriptionHandler.Delete)
 
 	address := ":" + cfg.AppPort
-	log.Printf("Subscription service started on port %v", cfg.AppPort)
+	log.Info("Subscription service started", "address", address)
 
 	err = router.Run(address)
 
 	if err != nil {
-		log.Fatalf("failed to start server: %v", err)
+		log.Error("failed to start server", "error", err)
+		os.Exit(1)
 	}
 }

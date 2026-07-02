@@ -8,7 +8,8 @@ import (
 )
 
 type Config struct {
-	AppPort string
+	AppPort  string
+	LogLevel string
 
 	DBHost     string
 	DBPort     string
@@ -26,7 +27,8 @@ func Load() *Config {
 	}
 
 	return &Config{
-		AppPort: getEnv("APP_PORT", "8080"),
+		AppPort:  getEnv("APP_PORT", "8080"),
+		LogLevel: getEnv("LOG_LEVEL", "info"),
 
 		DBHost:     getEnv("DB_HOST", "localhost"),
 		DBPort:     getEnv("DB_PORT", "5432"),

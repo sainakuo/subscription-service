@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -13,11 +14,13 @@ import (
 
 type SubscriptionHandler struct {
 	service *service.SubscriptionService
+	log     *slog.Logger
 }
 
-func NewSubscriptionHandler(service *service.SubscriptionService) *SubscriptionHandler {
+func NewSubscriptionHandler(service *service.SubscriptionService, log *slog.Logger) *SubscriptionHandler {
 	return &SubscriptionHandler{
 		service: service,
+		log:     log,
 	}
 }
 
@@ -58,9 +61,11 @@ type TotalCostResponse struct {
 }
 
 func (h *SubscriptionHandler) Create(c *gin.Context) {
+
 	var request CreateSubscriptionRequest
 
 	if err := c.ShouldBindJSON(&request); err != nil {
+		h.log.Warn("invalid create subscription request", "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "invalid request body",
 		})
@@ -68,6 +73,7 @@ func (h *SubscriptionHandler) Create(c *gin.Context) {
 	}
 
 	subscription, err := h.service.Create(
+
 		c.Request.Context(),
 		service.CreateSubscriptionInput{
 			ServiceName: request.ServiceName,
@@ -78,11 +84,18 @@ func (h *SubscriptionHandler) Create(c *gin.Context) {
 		},
 	)
 	if err != nil {
+		h.log.Warn("failed to create subscription", "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": err.Error(),
 		})
 		return
 	}
+
+	h.log.Info("subscription created",
+		"subscription_id", subscription.ID.String(),
+		"user_id", subscription.UserID.String(),
+		"service_name", subscription.ServiceName,
+	)
 
 	c.JSON(http.StatusCreated, toSubscriptionResponse(subscription))
 }
@@ -178,6 +191,7 @@ func (h *SubscriptionHandler) Update(c *gin.Context) {
 		},
 	)
 	if err != nil {
+		h.log.Warn("failed to update subscription", "id", id, "error", err)
 		if errors.Is(err, service.ErrSubscriptionNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": "subscription not found",
@@ -190,6 +204,12 @@ func (h *SubscriptionHandler) Update(c *gin.Context) {
 		})
 		return
 	}
+
+	h.log.Info("subscription updated",
+		"subscription_id", subscription.ID.String(),
+		"user_id", subscription.UserID.String(),
+		"service_name", subscription.ServiceName,
+	)
 
 	c.JSON(http.StatusOK, toSubscriptionResponse(subscription))
 }
@@ -199,6 +219,7 @@ func (h *SubscriptionHandler) Delete(c *gin.Context) {
 
 	err := h.service.Delete(c.Request.Context(), id)
 	if err != nil {
+		h.log.Warn("failed to delete subscription", "id", id, "error", err)
 		if errors.Is(err, service.ErrSubscriptionNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": "subscription not found",
@@ -211,6 +232,8 @@ func (h *SubscriptionHandler) Delete(c *gin.Context) {
 		})
 		return
 	}
+
+	h.log.Info("subscription deleted", "subscription_id", id)
 
 	c.Status(http.StatusNoContent)
 }
@@ -243,11 +266,21 @@ func (h *SubscriptionHandler) CalculateTotalCost(c *gin.Context) {
 		},
 	)
 	if err != nil {
+		h.log.Warn("failed to calculate total cost", "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": err.Error(),
 		})
 		return
 	}
+
+	h.log.Info("total cost calculated",
+		"total_price", result.TotalPrice,
+		"currency", result.Currency,
+		"from", result.From,
+		"to", result.To,
+		"user_id", result.UserID,
+		"service_name", result.ServiceName,
+	)
 
 	c.JSON(http.StatusOK, TotalCostResponse{
 		TotalPrice:  result.TotalPrice,
