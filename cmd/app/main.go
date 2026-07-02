@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
+	docs "github.com/sainakuo/subscription-service/docs"
 	"github.com/sainakuo/subscription-service/internal/config"
 	database "github.com/sainakuo/subscription-service/internal/db"
 	"github.com/sainakuo/subscription-service/internal/handler"
@@ -13,8 +14,15 @@ import (
 	"github.com/sainakuo/subscription-service/internal/middleware"
 	"github.com/sainakuo/subscription-service/internal/repository"
 	"github.com/sainakuo/subscription-service/internal/service"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
+// @title Subscription Service API
+// @version 1.0
+// @description REST service for aggregating user online subscriptions.
+// @host localhost:8080
+// @BasePath /
 func main() {
 	cfg := config.Load()
 
@@ -49,13 +57,21 @@ func main() {
 	router.Use(gin.Recovery())
 	router.Use(middleware.RequestLogger(log))
 
+	docs.SwaggerInfo.Title = "Subscription Service API"
+	docs.SwaggerInfo.Description = "REST service for aggregating user online subscriptions"
+	docs.SwaggerInfo.Version = "1.0"
+	docs.SwaggerInfo.Host = "localhost:" + cfg.AppPort
+	docs.SwaggerInfo.BasePath = "/"
+	docs.SwaggerInfo.Schemes = []string{"http"}
+
 	router.GET("/health", handler.HealthCheck)
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	router.POST("/subscriptions", subscriptionHandler.Create)
 
 	router.GET("/subscriptions", subscriptionHandler.List)
 
-	router.GET("/subscriptions/total", subscriptionHandler.CalculateTotalCost)
+	router.GET("/subscriptions/total-cost", subscriptionHandler.CalculateTotalCost)
 
 	router.GET("/subscriptions/:id", subscriptionHandler.GetByID)
 

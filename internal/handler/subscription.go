@@ -60,6 +60,27 @@ type TotalCostResponse struct {
 	ServiceName string `json:"service_name,omitempty"`
 }
 
+type ErrorResponse struct {
+	Error string `json:"error"`
+}
+
+type ListSubscriptionsResponse struct {
+	Items  []SubscriptionResponse `json:"items"`
+	Count  int                    `json:"count"`
+	Limit  int                    `json:"limit"`
+	Offset int                    `json:"offset"`
+}
+
+// Create godoc
+// @Summary Create subscription
+// @Description Create a new user subscription
+// @Tags subscriptions
+// @Accept json
+// @Produce json
+// @Param input body CreateSubscriptionRequest true "Subscription data"
+// @Success 201 {object} SubscriptionResponse
+// @Failure 400 {object} ErrorResponse
+// @Router /subscriptions [post]
 func (h *SubscriptionHandler) Create(c *gin.Context) {
 
 	var request CreateSubscriptionRequest
@@ -100,6 +121,16 @@ func (h *SubscriptionHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, toSubscriptionResponse(subscription))
 }
 
+// GetByID godoc
+// @Summary Get subscription by ID
+// @Description Get a subscription by its UUID
+// @Tags subscriptions
+// @Produce json
+// @Param id path string true "Subscription ID"
+// @Success 200 {object} SubscriptionResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Router /subscriptions/{id} [get]
 func (h *SubscriptionHandler) GetByID(c *gin.Context) {
 	id := c.Param("id")
 
@@ -121,6 +152,18 @@ func (h *SubscriptionHandler) GetByID(c *gin.Context) {
 	c.JSON(http.StatusOK, toSubscriptionResponse(subscription))
 }
 
+// List godoc
+// @Summary List subscriptions
+// @Description Get subscriptions list with optional filters
+// @Tags subscriptions
+// @Produce json
+// @Param user_id query string false "User UUID"
+// @Param service_name query string false "Service name"
+// @Param limit query int false "Limit"
+// @Param offset query int false "Offset"
+// @Success 200 {object} ListSubscriptionsResponse
+// @Failure 400 {object} ErrorResponse
+// @Router /subscriptions [get]
 func (h *SubscriptionHandler) List(c *gin.Context) {
 	limit, err := parseQueryInt(c, "limit", 20)
 	if err != nil {
@@ -159,14 +202,26 @@ func (h *SubscriptionHandler) List(c *gin.Context) {
 		items = append(items, toSubscriptionResponse(&subscriptions[i]))
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"items":  items,
-		"count":  len(items),
-		"limit":  limit,
-		"offset": offset,
+	c.JSON(http.StatusOK, ListSubscriptionsResponse{
+		Items:  items,
+		Count:  len(items),
+		Limit:  limit,
+		Offset: offset,
 	})
 }
 
+// Update godoc
+// @Summary Update subscription
+// @Description Update an existing subscription by ID
+// @Tags subscriptions
+// @Accept json
+// @Produce json
+// @Param id path string true "Subscription ID"
+// @Param input body UpdateSubscriptionRequest true "Updated subscription data"
+// @Success 200 {object} SubscriptionResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Router /subscriptions/{id} [put]
 func (h *SubscriptionHandler) Update(c *gin.Context) {
 	id := c.Param("id")
 
@@ -214,6 +269,16 @@ func (h *SubscriptionHandler) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, toSubscriptionResponse(subscription))
 }
 
+// Delete godoc
+// @Summary Delete subscription
+// @Description Delete a subscription by ID
+// @Tags subscriptions
+// @Produce json
+// @Param id path string true "Subscription ID"
+// @Success 204
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Router /subscriptions/{id} [delete]
 func (h *SubscriptionHandler) Delete(c *gin.Context) {
 	id := c.Param("id")
 
@@ -238,6 +303,18 @@ func (h *SubscriptionHandler) Delete(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+// CalculateTotalCost godoc
+// @Summary Calculate total subscriptions cost
+// @Description Calculate total cost of subscriptions for selected period with optional filters
+// @Tags subscriptions
+// @Produce json
+// @Param from query string true "Start period in MM-YYYY format"
+// @Param to query string true "End period in MM-YYYY format"
+// @Param user_id query string false "User UUID"
+// @Param service_name query string false "Service name"
+// @Success 200 {object} TotalCostResponse
+// @Failure 400 {object} ErrorResponse
+// @Router /subscriptions/total-cost [get]
 func (h *SubscriptionHandler) CalculateTotalCost(c *gin.Context) {
 	from := c.Query("from")
 	to := c.Query("to")
